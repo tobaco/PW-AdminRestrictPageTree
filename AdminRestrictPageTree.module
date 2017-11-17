@@ -24,25 +24,25 @@ class AdminRestrictPageTree extends WireData implements Module, ConfigurableModu
 {
     public static function getModuleInfo()
     {
-		return array(
-			'title'    => 'Admin Restrict Page Tree',
-			'summary'  => 'Hides the page tree from users who have certain role(s).',
-			'author'   => 'Wanze, Kongondo, Netcarver',
-			'version'  => 100,
-			'href'     => 'https://processwire.com/talk/topic/6142-hide-page-tree-in-the-admin/#entry60087',
-			'singular' => true,
-			'autoload' => true,
-		);
-	}
+        return array(
+            'title'    => 'Admin Restrict Page Tree',
+            'summary'  => 'Hides the page tree from users who have certain role(s).',
+            'author'   => 'Wanze, Kongondo, Netcarver',
+            'version'  => 101,
+            'href'     => 'https://processwire.com/talk/topic/6142-hide-page-tree-in-the-admin/#entry60087',
+            'singular' => true,
+            'autoload' => true,
+        );
+    }
 
 
     /**
-     *	Initialise the module.
+     *  Initialise the module.
      *
      * ProcessWire calls this when the module is loaded. For 'autoload' modules, this will be called.
      * when ProcessWire's API is ready. As a result, this is a good place to attach hooks.
      *
-     *	@access public
+     *  @access public
      *
      */
     public function init()
@@ -57,6 +57,7 @@ class AdminRestrictPageTree extends WireData implements Module, ConfigurableModu
         return array(
             'restricted_roles' => array(),
             'landing_page'     => 2,
+            'landing_page_man'     => '',
         );
     }
 
@@ -76,7 +77,9 @@ class AdminRestrictPageTree extends WireData implements Module, ConfigurableModu
     {
         foreach ($this->restricted_roles as $r) {
             if ($this->user->hasRole($r)) {
-                $this->session->redirect($this->landing_page);
+                $redirect_url = ($this->landing_page_man) ? $this->landing_page_man : $this->landing_page ;
+                $redirect_url;
+                $this->session->redirect($redirect_url);
             }
         }
     }
@@ -90,12 +93,17 @@ class AdminRestrictPageTree extends WireData implements Module, ConfigurableModu
     {
         $page = $event->object;
         $user = $this->user;
-	
-        if ($page->id == 3 || $page->id == 8) {
-            foreach ($this->restricted_roles as $r) {
-                if ($user->hasRole($r)) {
-                    $event->return = false;
-                }
+
+        if ($page->id != 3 && $page->id != 8) {
+            return;
+        }
+
+        foreach ($this->restricted_roles as $r) {
+            if ($user->hasRole($r)) {
+                //$event->return = false;
+                $redirect_url = ($this->landing_page_man) ? $this->landing_page_man : $this->landing_page ;
+                $redirect_url;
+                $this->session->redirect($redirect_url);
             }
         }
     }
@@ -103,39 +111,50 @@ class AdminRestrictPageTree extends WireData implements Module, ConfigurableModu
 
     static public function getModuleConfigInputfields(array $data)
     {
-		$fields = new InputfieldWrapper();
-		$modules = wire('modules');
+        $fields = new InputfieldWrapper();
+        $modules = wire('modules');
 
         $role_list = self::makeOptions(wire('roles'));
-		$f = $modules->get("InputfieldAsmSelect");
-		$f->name = "restricted_roles";
-		$f->label =  __("Roles that will have the pages tree hidden from them");
+        $f = $modules->get("InputfieldAsmSelect");
+        $f->name = "restricted_roles";
+        $f->label =  __("Roles that will have the pages tree hidden from them");
         $f->options = $role_list;
         if (isset($data['restricted_roles'])) {
             $f->value = $data['restricted_roles'];
         } else {
             $f->value = '';
         }
-		$fields->add($f);
+        $fields->add($f);
 
 
-        $page_list = self::makeOptions(wire('pages')->find('template=admin'));
-		$f = $modules->get("InputfieldSelect");
-		$f->name = "landing_page";
-		$f->label =  __("Page to redirect restricted users to.");
+        $page_list = self::makeOptions(wire('pages')->find('template=admin'), false, true);
+        $f = $modules->get("InputfieldSelect");
+        $f->name = "landing_page";
+        $f->label =  __("Page to redirect restricted users to.");
         $f->options = $page_list;
         if (isset($data['landing_page'])) {
             $f->value = $data['landing_page'];
         } else {
             $f->value = '';
         }
-		$fields->add($f);
+        $fields->add($f);
 
-		return $fields;
-	}
+        $f = $modules->get("InputfieldText");
+        $f->name = "landing_page_man";
+        $f->label =  __("Path/URL to redirect restricted users to.");
+        $f->placeholder =  __("/admin/profile/");
+        if (isset($data['landing_page_man'])) {
+            $f->value = $data['landing_page_man'];
+        } else {
+            $f->value = '';
+        }
+        $fields->add($f);
+
+        return $fields;
+    }
 
 
-    static public function makeOptions($wirearray, $include_blank = true)
+    static public function makeOptions($wirearray, $include_blank = true, $get_path = false)
     {
         $options = array();
         if ($include_blank) {
@@ -146,6 +165,9 @@ class AdminRestrictPageTree extends WireData implements Module, ConfigurableModu
             $name = $f->name;
             $key  = $name;
             $key  = wire('sanitizer')->name($name);
+            if ($get_path) {
+                $key  = $f->path;
+            }
             $options[$key] = $name;
         }
 
